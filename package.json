@@ -1,0 +1,31 @@
+{
+  "name": "markdown-index",
+  "version": "0.0.0",
+  "description": "Build a markdown table of contents for all the markdown files in a given directory tree.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeke/markdown-index.git"
+  },
+  "keywords": [
+    "markdown",
+    "toc",
+    "marked",
+    "index"
+  ],
+  "author": "zeke",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/zeke/markdown-index/issues"
+  },
+  "homepage": "https://github.com/zeke/markdown-index",
+  "dependencies": {
+    "marked": "~0.3.0",
+    "marked-toc": "~0.1.5",
+    "glob": "~3.2.7"
+  },
+  "bin": "./index.js"
+}
