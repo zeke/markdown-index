@@ -27,5 +27,11 @@
   },
   "bin": {
     "markdown-index": "bin/markdown-index.js"
+  },
+  "devDependencies": {
+    "eslint": "^0.21.2"
+  },
+  "scripts": {
+    "lint": "eslint index.js"
   }
 }
