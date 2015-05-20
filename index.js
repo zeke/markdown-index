@@ -1,4 +1,3 @@
-// jscs:disable
 'use strict';
 
 var fs = require('fs'),
@@ -13,11 +12,10 @@ var fs = require('fs'),
  * @type {string[]}
  */
 var IGNORED = ['node_modules/'],
-  H3 = '###',
-  H4 = '####',
   format = util.format,
-  writeFile = Promise.promisify(fs.writeFile),
-  readFile = Promise.promisify(fs.readFile);
+  makeIgnoreFilter, markdownIndex;
+
+Promise.promisifyAll(fs);
 
 /**
  * Callback for TOC
@@ -29,10 +27,11 @@ var IGNORED = ['node_modules/'],
 /**
  * Creates a filter function to remove any occurance of `dir` from files
  * ignored by default.
+ * @param {string} dir Dirpath
  * @see {@link IGNORED}
- * @returns {Function}
+ * @returns {Function} Filter function
  */
-var makeIgnoreFilter = function makeIgnoreFilter(dir) {
+makeIgnoreFilter = function makeIgnoreFilter(dir) {
   var normalizedDir = path.normalize(dir),
     /**
      * Filter function to assert a
@@ -46,15 +45,6 @@ var makeIgnoreFilter = function makeIgnoreFilter(dir) {
 };
 
 /**
- * Return a glob into a recursive, negated glob
- * @param {string} glob Glob
- * @returns {string} recursive, negated glob
- */
-var ignoreMap = function ignoreMap(glob) {
-  return format('!**/%s/**', path.normalize(path.join(glob, '.')));
-};
-
-/**
  * Returns a string TOC for Markdown files found recursively in a given
  * directory.
  * `node_modules` is ignored.
@@ -64,9 +54,9 @@ var ignoreMap = function ignoreMap(glob) {
  * using Promises.
  * @returns {Promise.<string>} TOC
  */
-var markdownIndex = function markdownIndex(dir, exclude, callback) {
+markdownIndex = function markdownIndex(dir, exclude, callback) {
 
-  var tables, filepaths, err, globs, ignored, lastSubdir;
+  var filepaths, globs, ignored;
 
   if (!(dir && typeof dir === 'string')) {
     return Promise.reject(new Error('invalid parameters'))
@@ -82,7 +72,7 @@ var markdownIndex = function markdownIndex(dir, exclude, callback) {
    * Filtered list of ignores that are not `dir`
    * @type {Array.<string>}
    */
-  ignored = IGNORED.filter(makeIgnoreFilter(dir)).map(ignoreMap);
+  ignored = IGNORED.filter(makeIgnoreFilter(dir));
 
   // in globule, ignored files must come last
   globs = [path.join(dir, '**', '*.md')].concat(ignored);
@@ -93,47 +83,29 @@ var markdownIndex = function markdownIndex(dir, exclude, callback) {
 
   // Recursively read all markdown files
   filepaths = globule.find.apply(globule, globs);
-  tables = filepaths.map(function (filepath) {
-    var table, basename, relative, subdir, heading;
 
-    if (err) {
-      return;
-    }
+  return Promise.each(filepaths, function (filepath) {
+    var table, basename, relative;
 
     // Create table of contents
-    try {
-      table = toc(fs.readFileSync(filepath, 'utf8'));
-    } catch (e) {
-      return (err = e);
-    }
+    return fs.readFile(filepath, 'utf8')
+      .then(function (file) {
+        table = toc(file);
 
-    basename = path.basename(filepath, '.md');
-    relative = path.relative(dir, filepath);
-    subdir = path.dirname(relative);
+        basename = path.basename(filepath, '.md');
+        relative = path.relative(dir, filepath);
 
-    if (subdir !== path.dirname(dir)) {
-      if (subdir !== lastSubdir) {
-        table = format('%s [%s](%s)\n%s', H4, basename, relative, table);
-      }
-      table = format('%s [%s](%s)\n%s', H3, subdir, subdir, table);
-    } else {
-      table = format('%s [%s](%s)\n%s', H3, basename, relative, table)
-    }
-    lastSubdir = subdir;
+        // Add filename as a heading; prepend filename to links
+        table = format('### [%s](%s)\n%s', basename, relative, table)
+          .replace(/\(#/g, format('(%s#', relative));
 
-    // Prepend filename to links
-    table = table.replace(/\(#/g, format('(%s#', relative));
-
-    return table;
-  });
-
-  if (err) {
-    return Promise.reject(err)
-      .nodeify(callback);
-  } else {
-    return Promise.resolve(tables.join('\n'))
-      .nodeify(callback);
-  }
+        return table;
+      });
+  })
+    .then(function (tables) {
+      return tables.join('\n');
+    })
+    .nodeify(callback);
 };
 
 /**
@@ -156,12 +128,11 @@ markdownIndex.inject = function inject(filepath, toc, callback) {
       .nodeify(callback);
   }
 
-  return readFile(filepath, 'utf8')
+  return fs.readFile(filepath, 'utf8')
     .then(function (str) {
-      var replaced = str
+      return fs.writeFile(filepath, str
         .replace(/(<!--\s*TOC\s*-->)[\S\s]*(<!--\s*\/TOC\s*-->)/i,
-        format('$1\n%s\n$2', toc));
-      return writeFile(filepath, replaced);
+        format('$1\n%s\n$2', toc)));
     })
     .nodeify(callback);
 };
