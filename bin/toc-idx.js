@@ -9,7 +9,7 @@ var argv = yargs
     .option('inject', {
       alias: 'i',
       describe: 'Do not output to STDOUT; instead, inject TOC into file at ' +
-      'range marked by <!-- TOC -->...<!-- /TOC -->".  Mutually exclusive ' +
+      'range marked by "<!-- INDEX -->...<!-- /INDEX -->".  Mutually exclusive ' +
       'with "--output"'
     })
     .option('exclude', {
@@ -23,13 +23,17 @@ var argv = yargs
       'exclusive with "--inject"'
     })
     .strict()
-    .usage('Writes a TOC for a directory fulla Markdown files to STDOUT.\n\n' +
-    'Usage: markdown-index [options] [directory]')
+    .usage('Writes an index for a directory fulla Markdown files to STDOUT.' +
+    '\n\nUsage: $0 [options] [directory-or-glob]')
+    .example('$0 --inject README.md docs/',
+    'Inject an index of all *.md files within docs/ and its subdirectories ' +
+    'into README.md')
+    .example('$0 --output INDEX.md docs/*.md',
+    'Output the index of files matching glob docs/*.md to new file INDEX.md')
     .help('help')
     .alias('help', 'h')
     .version(function getVersion() {
-      return require(require('path').join(__dirname, '..', 'package.json'))
-        .version;
+      return require('../package.json').version;
     })
     .alias('version', 'v')
     .check(function checkArgs(argv) {

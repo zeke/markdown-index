@@ -13,6 +13,8 @@ var util = require('util'),
 var IGNORED = ['node_modules/**/*.md'],
   format = util.format,
   makeIgnoreFilter, markdownIndex,
+  injectRegex = new RegExp('(<!--\s*INDEX\s*-->)[\S\s]*(<!--\s*\/INDEX\s*-->)',
+    'i'),
   fs = Promise.promisifyAll(require('fs'));
 
 Promise.longStackTraces();
@@ -116,7 +118,7 @@ markdownIndex = function markdownIndex(dir, exclude, callback) {
  */
 
 /**
- * Inject a TOC string into file at range "<!-- TOC -->...<!-- /TOC -->"
+ * Inject a TOC string into file at range described by `injectRegex`
  * @param {string} filepath File to inject TOC into
  * @param {string} toc TOC string
  * @param {Function} [callback] Optional callback.  Omit if using Promises.
@@ -130,9 +132,8 @@ markdownIndex.inject = function inject(filepath, toc, callback) {
 
   return fs.readFileAsync(filepath, 'utf8')
     .then(function (str) {
-      return fs.writeFileAsync(filepath, str
-        .replace(/(<!--\s*TOC\s*-->)[\S\s]*(<!--\s*\/TOC\s*-->)/i,
-        format('$1\n%s\n$2', toc)));
+      return fs.writeFileAsync(filepath,
+        str.replace(injectRegex).format('$1\n%s\n$2', toc));
     })
     .nodeify(callback);
 };
