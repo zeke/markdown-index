@@ -1,7 +1,6 @@
 'use strict';
 
-var fs = require('fs'),
-  util = require('util'),
+var util = require('util'),
   path = require('path'),
   globule = require('globule'),
   Promise = require('bluebird'),
@@ -11,11 +10,12 @@ var fs = require('fs'),
  * Globs ignored by default.
  * @type {string[]}
  */
-var IGNORED = ['node_modules/'],
+var IGNORED = ['node_modules/**/*.md'],
   format = util.format,
-  makeIgnoreFilter, markdownIndex;
+  makeIgnoreFilter, markdownIndex,
+  fs = Promise.promisifyAll(require('fs'));
 
-Promise.promisifyAll(fs);
+Promise.longStackTraces();
 
 /**
  * Callback for TOC
@@ -72,7 +72,11 @@ markdownIndex = function markdownIndex(dir, exclude, callback) {
    * Filtered list of ignores that are not `dir`
    * @type {Array.<string>}
    */
-  ignored = IGNORED.filter(makeIgnoreFilter(dir));
+  ignored = IGNORED
+    .filter(makeIgnoreFilter(dir))
+    .map(function (ignore) {
+      return '!' + path.join(dir, ignore);
+    });
 
   // in globule, ignored files must come last
   globs = [path.join(dir, '**', '*.md')].concat(ignored);
@@ -84,22 +88,18 @@ markdownIndex = function markdownIndex(dir, exclude, callback) {
   // Recursively read all markdown files
   filepaths = globule.find.apply(globule, globs);
 
-  return Promise.each(filepaths, function (filepath) {
-    var table, basename, relative;
-
+  return Promise.map(filepaths, function (filepath) {
     // Create table of contents
-    return fs.readFile(filepath, 'utf8')
+    return fs.readFileAsync(filepath, 'utf8')
       .then(function (file) {
-        table = toc(file);
+        var basename, relative, table = toc(file);
 
         basename = path.basename(filepath, '.md');
         relative = path.relative(dir, filepath);
 
         // Add filename as a heading; prepend filename to links
-        table = format('### [%s](%s)\n%s', basename, relative, table)
+        return format('### [%s](%s)\n%s', basename, relative, table)
           .replace(/\(#/g, format('(%s#', relative));
-
-        return table;
       });
   })
     .then(function (tables) {
@@ -128,9 +128,9 @@ markdownIndex.inject = function inject(filepath, toc, callback) {
       .nodeify(callback);
   }
 
-  return fs.readFile(filepath, 'utf8')
+  return fs.readFileAsync(filepath, 'utf8')
     .then(function (str) {
-      return fs.writeFile(filepath, str
+      return fs.writeFileAsync(filepath, str
         .replace(/(<!--\s*TOC\s*-->)[\S\s]*(<!--\s*\/TOC\s*-->)/i,
         format('$1\n%s\n$2', toc)));
     })
