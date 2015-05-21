@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/zeke/markdown-index",
   "dependencies": {
-    "bluebird": "^2.9.14",
+    "bluebird": "^2.9.25",
     "globule": "^0.2.0",
     "marked-toc": "^0.3.0",
     "yargs": "^3.5.4"
