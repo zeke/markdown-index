@@ -1,31 +1,45 @@
 {
-  "name": "markdown-index",
-  "version": "0.0.0",
-  "description": "Build a markdown table of contents for all the markdown files in a given directory tree.",
+  "name": "markdown-toc-index",
+  "version": "0.1.0",
+  "description": "Builds an index of Markdown files",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/zeke/markdown-index.git"
+    "url": "https://github.com/boneskull/markdown-toc-index.git"
   },
   "keywords": [
     "markdown",
     "toc",
     "marked",
-    "index"
+    "index",
+    "glob",
+    "md",
+    "recursive",
+    "table",
+    "contents"
   ],
-  "author": "zeke",
+  "authors": [
+    "zeke",
+    "Christopher Hiller <boneskull@boneskull.com>"
+  ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/zeke/markdown-index/issues"
+    "url": "https://github.com/boneskull/markdown-toc-index/issues"
   },
-  "homepage": "https://github.com/zeke/markdown-index",
+  "homepage": "https://github.com/boneskull/markdown-toc-index",
   "dependencies": {
-    "marked": "~0.3.0",
-    "marked-toc": "~0.1.5",
-    "glob": "~3.2.7"
+    "bluebird": "^2.9.25",
+    "globule": "^0.2.0",
+    "marked-toc": "^0.3.0",
+    "yargs": "^3.5.4"
   },
-  "bin": "./index.js"
+  "bin": {
+    "toc-idx": "bin/toc-idx.js"
+  },
+  "devDependencies": {
+    "eslint": "^0.21.2"
+  },
+  "scripts": {
+    "lint": "eslint index.js"
+  }
 }

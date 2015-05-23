@@ -1,0 +1,5 @@
+**/docs/**.js
+bower_components/
+support/
+vendor/
+node_modules/

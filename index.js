@@ -1,39 +1,141 @@
-#!/usr/bin/env node
+'use strict';
 
-var fs = require("fs")
-var marked = require("marked")
-var glob = require("glob")
-var toc = require('marked-toc');
+var util = require('util'),
+  path = require('path'),
+  globule = require('globule'),
+  Promise = require('bluebird'),
+  toc = require('marked-toc');
 
-var dir = process.argv[2]
+/**
+ * Globs ignored by default.
+ * @type {string[]}
+ */
+var IGNORED = ['node_modules/**/*.md'],
+  format = util.format,
+  makeIgnoreFilter, markdownIndex,
+  injectRegex = new RegExp('(<!--\s*INDEX\s*-->)[\S\s]*(<!--\s*\/INDEX\s*-->)',
+    'i'),
+  fs = Promise.promisifyAll(require('fs'));
 
-if (!dir) {
-  console.log("\nUsage: \nmarkdown-index directory/fulla/markdowns\n")
-  process.exit(1)
-}
+Promise.longStackTraces();
 
-// Recursively read all markdown files
-glob(dir + "/**/*.md", function (err, files) {
-  // console.log(files);
-  var tables = files.map(function(file) {
+/**
+ * Callback for TOC
+ * @callback markdownIndex.tocCallback
+ * @param {(Error|string|null)} Error, if any
+ * @param {string} TOC
+ */
 
+/**
+ * Creates a filter function to remove any occurance of `dir` from files
+ * ignored by default.
+ * @param {string} dir Dirpath
+ * @see {@link IGNORED}
+ * @returns {Function} Filter function
+ */
+makeIgnoreFilter = function makeIgnoreFilter(dir) {
+  var normalizedDir = path.normalize(dir),
+    /**
+     * Filter function to assert a
+     * @param {string} glob Ignored glob
+     * @returns {boolean} If dir matches a glob
+     */
+    ignoreFilter = function ignoreFilter(glob) {
+      return !globule.isMatch(glob, normalizedDir);
+    };
+  return ignoreFilter;
+};
+
+/**
+ * Returns a string TOC for Markdown files found recursively in a given
+ * directory.
+ * `node_modules` is ignored.
+ * @param {string} dir Dir to walk
+ * @param {(string|Function)} [exclude] Glob to ignore or callback
+ * @param {markdownIndex.tocCallback} [callback] Callback function; omit if
+ * using Promises.
+ * @returns {Promise.<string>} TOC
+ */
+markdownIndex = function markdownIndex(dir, exclude, callback) {
+
+  var filepaths, globs, ignored;
+
+  if (!(dir && typeof dir === 'string')) {
+    return Promise.reject(new Error('invalid parameters'))
+      .nodeify(callback);
+  }
+
+  if (typeof exclude !== 'string') {
+    callback = exclude;
+    exclude = null;
+  }
+
+  /**
+   * Filtered list of ignores that are not `dir`
+   * @type {Array.<string>}
+   */
+  ignored = IGNORED
+    .filter(makeIgnoreFilter(dir))
+    .map(function (ignore) {
+      return '!' + path.join(dir, ignore);
+    });
+
+  // in globule, ignored files must come last
+  globs = [path.join(dir, '**', '*.md')].concat(ignored);
+
+  if (exclude) {
+    globs.push(format('!%s', path.resolve(exclude)));
+  }
+
+  // Recursively read all markdown files
+  filepaths = globule.find.apply(globule, globs);
+
+  return Promise.map(filepaths, function (filepath) {
     // Create table of contents
-    var table = toc(fs.readFileSync(file).toString(), 'utf8')
+    return fs.readFileAsync(filepath, 'utf8')
+      .then(function (file) {
+        var basename, relative, table = toc(file);
 
-    if (file.match('index.md')) return;
-    // if (file.match('README.md')) return;
-    if (file.match('node_modules')) return;
-    if (table.length < 10) return;
+        basename = path.basename(filepath, '.md');
+        relative = path.relative(dir, filepath);
 
-    // Add filename as a heading
-    table = "### [" + file + "](" + file + ")\n\n" + table
-
-    // Prepend filename to links
-    table = table.replace(/\(#/g, "(" + file + "#")
-    return table;
+        // Add filename as a heading; prepend filename to links
+        return format('### [%s](%s)\n%s', basename, relative, table)
+          .replace(/\(#/g, format('(%s#', relative));
+      });
   })
+    .then(function (tables) {
+      return tables.join('\n');
+    })
+    .nodeify(callback);
+};
 
-  process.stdout.write(tables.join("\n\n"));
-  return tables.join("\n\n");
+/**
+ * Callback for inject
+ * @callback markdownIndex.injectCallback
+ * @param {(Error|string|null)} Error, if any
+ * @param {*} Callback value from fs.writeFile
+ */
 
-})
+/**
+ * Inject a TOC string into file at range described by `injectRegex`
+ * @param {string} filepath File to inject TOC into
+ * @param {string} toc TOC string
+ * @param {Function} [callback] Optional callback.  Omit if using Promises.
+ * @returns {Promise} Resolves when complete
+ */
+markdownIndex.inject = function inject(filepath, toc, callback) {
+  if (typeof toc !== 'string' || typeof filepath !== 'string' || !filepath) {
+    return Promise.reject(new Error('invalid parameters'))
+      .nodeify(callback);
+  }
+
+  return fs.readFileAsync(filepath, 'utf8')
+    .then(function (str) {
+      return fs.writeFileAsync(filepath,
+        str.replace(injectRegex).format('$1\n%s\n$2', toc));
+    })
+    .nodeify(callback);
+};
+
+module.exports = markdownIndex;
