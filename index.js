@@ -3,7 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 const glob = require('glob')
-const toc = require('marked-toc')
+const toc = require('markdown-toc')
 const inflection = require('inflection')
 const dir = process.argv[2]
 
@@ -15,23 +15,31 @@ if (!dir) {
 glob(dir + '/**/*.md', function (err, files) {
   if (err) throw err
   var tables = files.map(function (file) {
-    var table = toc(fs.readFileSync(file, 'utf8'))
-
     if (file.match('index.md')) return
     if (file.match('README.md')) return
     if (file.match('node_modules')) return
-    if (table.length < 10) return
 
-    var prettyFile = inflection.titleize(path.parse(file).name.replace(/(_|-)/g, ' '))
+    var filenameSlug = toc.slugify(path.parse(file).name)
+    var originalLinkify = toc.linkify
+    var table = toc(fs.readFileSync(file, 'utf8'), {
+      filter: function(str, ele, arr) {
+        // Skip top-level elements if their slug matches a slug of the filename.
+        return ele.level != 1 || ele.slug != filenameSlug
+      },
+      linkify: function(tok, text, slug, opts) {
+        // Use empty options arg to avoid infinite recursion.
+        var tok = originalLinkify(tok, text, slug, {})
+        // Prepend filename to links.
+        tok.content = tok.content.replace('#', file + '#')
+        return tok
+      }
+    })
 
-    // Add filename as a heading
-    table = '### [' + prettyFile + '](' + file + ')\n\n' + table
-
-    // Prepend filename to links
-    table = table.replace(/\(#/g, '(' + file + '#')
-    return table
+    // Add filename as a heading.
+    return '### [' + filenameSlug + '](' + file + ')\n\n' + table.content
   })
 
-  process.stdout.write(tables.join('\n'))
+  process.stdout.write(tables.join('\n\n'))
   return tables.join('\n\n')
 })
+
