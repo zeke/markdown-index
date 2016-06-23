@@ -30,8 +30,7 @@
   "dependencies": {
     "glob": "~3.2.7",
     "inflection": "^1.8.0",
-    "marked": "~0.3.0",
-    "marked-toc": "~0.1.5"
+    "markdown-toc": "~0.12.12"
   },
   "bin": "./index.js",
   "devDependencies": {
